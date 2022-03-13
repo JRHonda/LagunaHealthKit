@@ -7,6 +7,7 @@
 
 import HealthKit
 
+#if os(watchOS)
 enum LHKWorkoutSessionError: Error {
     case unknown
     case failedToStartWorkoutSession(with: Error)
@@ -193,3 +194,4 @@ extension LHKWorkoutSessionManager: HKLiveWorkoutBuilderDelegate {
             }
     }
 }
+#endif

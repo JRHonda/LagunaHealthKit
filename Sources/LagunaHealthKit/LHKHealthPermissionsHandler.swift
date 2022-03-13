@@ -1,5 +1,5 @@
 //
-//  HealthPermissionsHandler.swift
+//  LHKHealthPermissionsHandler.swift
 //  
 //
 //  Created by Justin Honda on 1/25/22.
