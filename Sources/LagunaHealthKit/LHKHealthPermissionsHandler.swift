@@ -18,23 +18,9 @@ public enum LHKHealthKitAuthorizationError: Error {
 
 public struct LHKHealthPermissionsHandler {
     
-    // MARK: - Properties
-    
-    public let shareTypes: Set<HKSampleType>
-    public let readTypes: Set<HKObjectType>
-    
-    
-    // MARK: - Public Init
-    
-    public init(shareTypes: Set<HKSampleType>, readTypes: Set<HKObjectType>) {
-        self.shareTypes = shareTypes
-        self.readTypes = readTypes
-    }
-    
-    
     // MARK: - Public Methods
     
-    public func requestAuthorization(_ completion: @escaping (Result<Bool, LHKHealthKitAuthorizationError>) -> Void) {
+    public static func requestAuthorization(with shareTypes: Set<HKSampleType>, readTypes: Set<HKObjectType>, _ completion: @escaping (Result<Bool, LHKHealthKitAuthorizationError>) -> Void) {
         guard HKHealthStore.isHealthDataAvailable() else {
             completion(.failure(.healthDataUnavailable))
             return

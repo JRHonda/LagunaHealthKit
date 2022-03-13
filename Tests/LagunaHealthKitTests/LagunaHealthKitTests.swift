@@ -29,21 +29,6 @@ final class LHKHealthPermissionsHandlerTests: XCTestCase {
         HKSeriesType.workoutRoute()
     ])
     
-    
-    // MARK: - System Under Test
-    
-    var sut: LHKHealthPermissionsHandler!
-    
-    
-    // MARK: - SetUp
-    
-    override func setUp() {
-        super.setUp()
-        
-        sut = .init(shareTypes: shareTypes, readTypes: readTypes)
-    }
-    
-    
     // MARK: - Tests
     
     func test_onlyOneInstanceOfHKHealthStoreExists() {

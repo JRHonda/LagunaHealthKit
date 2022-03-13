@@ -68,9 +68,7 @@ public final class LHKWorkoutSessionManager: NSObject {
     }
     
     public func pause() {
-        streamingQueries.forEach {
-            healthStore.stop($0)
-        }
+        streamingQueries.forEach { healthStore.stop($0) }
         streamingQueries.removeAll()
         workoutSession.pause()
     }
@@ -79,18 +77,19 @@ public final class LHKWorkoutSessionManager: NSObject {
         let resumeDate = Date.now
         DispatchQueue.global(qos: .background).async { [weak self] in
             guard let self = self else { return }
-            self.streamingQueries.insert(self.createStreamingHeartRateQuery(with: resumeDate))
+            self.streamingQueries.insert(
+                self.createStreamingHeartRateQuery(with: resumeDate)
+            )
         }
         workoutSession.resume()
     }
     
     public func stop() {
         endDate = .now
-        streamingQueries.forEach {
-            healthStore.stop($0)
-        }
+        streamingQueries.forEach { healthStore.stop($0) }
         streamingQueries.removeAll()
         workoutSession.end()
+        
         // *** Required for finishRoute() method of workoutRouteBuilder *** //
         workout = HKWorkout(activityType: workoutConfiguration.activityType, start: startDate!, end: endDate!)
     }
@@ -123,13 +122,13 @@ extension LHKWorkoutSessionManager: HKWorkoutSessionDelegate {
                                from fromState: HKWorkoutSessionState,
                                date: Date
     ) {
-        debugPrint("Workout session changed from state: \(fromState)")
-        debugPrint("Workout session changed to state: \(toState)")
+        debugPrint("Workout session changed from state: \(fromState.rawValue)")
+        debugPrint("Workout session changed to state:   \(toState.rawValue)")
         switch toState {
             case .notStarted: break
             case .running: break
             case .ended:
-                workoutBuilder.endCollection(withEnd: date) { [weak self] success, error in
+                workoutBuilder.endCollection(withEnd: date) { [weak self] _, error in
                     guard let self = self else { return }
                     if let error = error {
                         debugPrint("******* Workout builder end collection error:", error)
@@ -140,7 +139,7 @@ extension LHKWorkoutSessionManager: HKWorkoutSessionDelegate {
                             } else if let workout = workout {
                                 debugPrint("******* Workout builder finish workout finished successfully:", workout)
                                 // Save HKWorkout in order to finish route of workout route builder
-                                healthStore.save(self.workout) { success, error in
+                                healthStore.save(self.workout) { _, error in
                                     if let error = error {
                                         debugPrint("Error saving HKWorkout with healthStore with error:", error)
                                     } else {
