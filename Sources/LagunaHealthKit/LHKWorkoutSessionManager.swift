@@ -21,7 +21,6 @@ public final class LHKWorkoutSessionManager: NSObject {
     private(set) public var startDate: Date?
     private(set) public var endDate: Date?
     
-    private let healthStore = LHKHealthStore.shared
     private var streamingQueries = Set<HKQuery>()
     
     private lazy var workoutConfiguration: HKWorkoutConfiguration = {
@@ -39,20 +38,22 @@ public final class LHKWorkoutSessionManager: NSObject {
         startDate = .now
         
         do {
-            workoutSession = try .init(healthStore: healthStore, configuration: workoutConfiguration)
-            workoutSession.delegate = self
+            workoutSession      = try .init(healthStore: healthStore, configuration: workoutConfiguration)
+            workoutRouteBuilder = .init(healthStore: healthStore, device: nil)
+            workoutBuilder      = workoutSession.associatedWorkoutBuilder()
             
-            workoutBuilder = workoutSession.associatedWorkoutBuilder()
             workoutBuilder.shouldCollectWorkoutEvents = true
-            workoutBuilder.dataSource = .init(healthStore: healthStore, workoutConfiguration: workoutConfiguration)
-            workoutBuilder.delegate = self
+            workoutBuilder.dataSource                 = .init(healthStore: healthStore, workoutConfiguration: workoutConfiguration)
+            workoutBuilder.delegate                   = self
+            
+            workoutSession.delegate = self
         } catch {
             throw LHKWorkoutSessionError.failedToStartWorkoutSession(with: error)
         }
         
         workoutSession.startActivity(with: startDate!)
         
-        workoutBuilder.beginCollection(withStart: startDate!) { success, error in
+        workoutBuilder.beginCollection(withStart: startDate!) { _, error in
             if let error = error {
                 debugPrint("******* Workout builder began collection failed with error *******\n", error)
             } else {
@@ -139,7 +140,7 @@ extension LHKWorkoutSessionManager: HKWorkoutSessionDelegate {
                             } else if let workout = workout {
                                 debugPrint("******* Workout builder finish workout finished successfully:", workout)
                                 // Save HKWorkout in order to finish route of workout route builder
-                                self.healthStore.save(self.workout) { success, error in
+                                healthStore.save(self.workout) { success, error in
                                     if let error = error {
                                         debugPrint("Error saving HKWorkout with healthStore with error:", error)
                                     } else {

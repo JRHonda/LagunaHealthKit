@@ -8,6 +8,8 @@
 #if !os(macOS)
 import HealthKit
 
+public let healthStore = HKHealthStore()
+
 public enum LHKHealthKitAuthorizationError: Error {
     case unknown
     case healthDataUnavailable
@@ -38,7 +40,7 @@ public struct LHKHealthPermissionsHandler {
             return
         }
         
-        LHKHealthStore.shared.requestAuthorization(toShare: shareTypes, read: readTypes) { success, error in
+        healthStore.requestAuthorization(toShare: shareTypes, read: readTypes) { success, error in
             if let error = error {
                 completion(.failure(.systemError(error)))
             }

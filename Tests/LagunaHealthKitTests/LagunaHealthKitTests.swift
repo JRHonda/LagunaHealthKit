@@ -47,8 +47,8 @@ final class LHKHealthPermissionsHandlerTests: XCTestCase {
     // MARK: - Tests
     
     func test_onlyOneInstanceOfHKHealthStoreExists() {
-        let instanceOne = LHKHealthStore.shared
-        let instanceTwo = LHKHealthStore.shared
+        let instanceOne = healthStore
+        let instanceTwo = healthStore
         
         // identity equality
         XCTAssert(instanceOne === instanceTwo)
