@@ -8,6 +8,7 @@
 #if !os(macOS)
 import HealthKit
 
+/// Global, and only instance of `HKHealthStore`
 public let healthStore = HKHealthStore()
 
 public enum LHKHealthKitAuthorizationError: Error {

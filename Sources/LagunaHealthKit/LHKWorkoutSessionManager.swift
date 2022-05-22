@@ -5,15 +5,17 @@
 //  Created by Justin Honda on 3/12/22.
 //
 
+#if !os(macOS) && os(watchOS)
 import HealthKit
 
-#if os(watchOS)
 enum LHKWorkoutSessionError: Error {
     case unknown
     case failedToStartWorkoutSession(with: Error)
 }
 
 public final class LHKWorkoutSessionManager: NSObject {
+    
+    // MARK: - Public Properties
     
     private(set) public var workoutSession: HKWorkoutSession!
     private(set) public var workoutBuilder: HKLiveWorkoutBuilder!
@@ -22,18 +24,16 @@ public final class LHKWorkoutSessionManager: NSObject {
     private(set) public var startDate: Date?
     private(set) public var endDate: Date?
     
-    private var streamingQueries = Set<HKQuery>()
-    
-    private lazy var workoutConfiguration: HKWorkoutConfiguration = {
-        let workoutConfig = HKWorkoutConfiguration()
-        workoutConfig.locationType = .outdoor
-        workoutConfig.activityType = .running
-        return workoutConfig
-    }()
+    // MARK: - Public Publishers
     
     @Published private(set) public var heartRate: Double = 0
+    @Published private(set) public var avgHeartRate: Double = 0
+    
+    // MARK: - Public Init
     
     public override init() { super.init() }
+    
+    // MARK: - Public Methods
     
     public func start() throws {
         startDate = .now
@@ -68,12 +68,14 @@ public final class LHKWorkoutSessionManager: NSObject {
         }
     }
     
+    /// Will not be using for MarineFit
     public func pause() {
         streamingQueries.forEach { healthStore.stop($0) }
         streamingQueries.removeAll()
         workoutSession.pause()
     }
     
+    /// Will not be using for MarineFit
     public func resume() {
         let resumeDate = Date.now
         DispatchQueue.global(qos: .background).async { [weak self] in
@@ -94,6 +96,18 @@ public final class LHKWorkoutSessionManager: NSObject {
         // *** Required for finishRoute() method of workoutRouteBuilder *** //
         workout = HKWorkout(activityType: workoutConfiguration.activityType, start: startDate!, end: endDate!)
     }
+    
+    // MARK: - Private Properties
+    
+    private var streamingQueries = Set<HKQuery>()
+    
+    private lazy var workoutConfiguration: HKWorkoutConfiguration = {
+        let workoutConfig = HKWorkoutConfiguration()
+        workoutConfig.locationType = .outdoor
+        workoutConfig.activityType = .running
+        return workoutConfig
+    }()
+    
 }
 
 // MARK: - Queries
@@ -190,6 +204,10 @@ extension LHKWorkoutSessionManager: HKLiveWorkoutBuilderDelegate {
                    let heartRateValue = statistics.mostRecentQuantity()?.doubleValue(for: .countPerMin) {
                     
                     self?.heartRate = heartRateValue
+                    
+                    if let avgHeartRateValue = statistics.averageQuantity()?.doubleValue(for: .countPerMin) {
+                        self?.avgHeartRate = avgHeartRateValue
+                    }
                 }
             }
     }
