@@ -29,24 +29,27 @@ public final class LHKWorkoutSessionManager: NSObject {
     @Published private(set) public var heartRate: Double = 0
     @Published private(set) public var avgHeartRate: Double = 0
     
+    private let workoutConfiguration: HKWorkoutConfiguration
+    
     // MARK: - Public Init
     
-    public override init() { super.init() }
-    
+    public init(workoutConfiguration: HKWorkoutConfiguration) {
+        self.workoutConfiguration = workoutConfiguration
+    }
+        
     // MARK: - Public Methods
     
     public func start() throws {
         startDate = .now
         
         do {
-            workoutSession      = try .init(healthStore: healthStore, configuration: workoutConfiguration)
+            workoutSession = try .init(healthStore: healthStore, configuration: workoutConfiguration)
             workoutRouteBuilder = .init(healthStore: healthStore, device: nil)
-            workoutBuilder      = workoutSession.associatedWorkoutBuilder()
+            workoutBuilder = workoutSession.associatedWorkoutBuilder()
             
             workoutBuilder.shouldCollectWorkoutEvents = true
-            workoutBuilder.dataSource                 = .init(healthStore: healthStore, workoutConfiguration: workoutConfiguration)
-            workoutBuilder.delegate                   = self
-            
+            workoutBuilder.dataSource = .init(healthStore: healthStore, workoutConfiguration: workoutConfiguration)
+            workoutBuilder.delegate = self
             workoutSession.delegate = self
         } catch {
             throw LHKWorkoutSessionError.failedToStartWorkoutSession(with: error)
@@ -100,13 +103,6 @@ public final class LHKWorkoutSessionManager: NSObject {
     // MARK: - Private Properties
     
     private var streamingQueries = Set<HKQuery>()
-    
-    private lazy var workoutConfiguration: HKWorkoutConfiguration = {
-        let workoutConfig = HKWorkoutConfiguration()
-        workoutConfig.locationType = .outdoor
-        workoutConfig.activityType = .running
-        return workoutConfig
-    }()
     
 }
 
