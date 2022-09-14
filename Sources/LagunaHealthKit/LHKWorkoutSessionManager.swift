@@ -98,6 +98,28 @@ public final class LHKWorkoutSessionManager: NSObject {
         
         // *** Required for finishRoute() method of workoutRouteBuilder *** //
         workout = HKWorkout(activityType: workoutConfiguration.activityType, start: startDate!, end: endDate!)
+        
+        workoutBuilder.endCollection(withEnd: endDate!) { [weak self] _, error in
+            guard let self = self else { return }
+            if let error = error {
+                debugPrint("******* Workout builder end collection error:", error)
+            } else {
+                healthStore.save(self.workout) { success, error in
+                    guard success else {
+                        debugPrint("finishWorkout error", error as Any)
+                        return
+                    }
+                    self.workoutRouteBuilder.finishRoute(with: self.workout, metadata: nil) { workoutRoute, error in
+                        if let error = error {
+                            // will error if the HKWorkout instance is not saved prior to calling this method
+                            debugPrint("Error finishing workout route with error:", error)
+                        } else if let workoutRoute = workoutRoute {
+                            debugPrint("Successful completion finishing workout route building with route:", workoutRoute)
+                        }
+                    }
+                }
+            }
+        }
     }
     
     // MARK: - Private Properties
@@ -138,38 +160,38 @@ extension LHKWorkoutSessionManager: HKWorkoutSessionDelegate {
         switch toState {
             case .notStarted: break
             case .running: break
-            case .ended:
-                workoutBuilder.endCollection(withEnd: date) { [weak self] _, error in
-                    guard let self = self else { return }
-                    if let error = error {
-                        debugPrint("******* Workout builder end collection error:", error)
-                    } else {
-                        self.workoutBuilder.finishWorkout(completion: { workout, error in
-                            if let error = error {
-                                debugPrint("******* Workout builder finish workout error:", error)
-                            } else if let workout = workout {
-                                debugPrint("******* Workout builder finish workout finished successfully:", workout)
-                                // Save HKWorkout in order to finish route of workout route builder
-                                healthStore.save(self.workout) { _, error in
-                                    if let error = error {
-                                        debugPrint("Error saving HKWorkout with healthStore with error:", error)
-                                    } else {
-                                        self.workoutRouteBuilder.finishRoute(with: self.workout, metadata: nil) { workoutRoute, error in
-                                            if let error = error {
-                                                // will error if the HKWorkout instance is not saved prior to calling this method
-                                                debugPrint("Error finishing workout route with error:", error)
-                                            } else if let workoutRoute = workoutRoute {
-                                                debugPrint("Successful completion finishing workout route building with route:", workoutRoute)
-                                            }
-                                        }
-                                    }
-                                }
-                            } else {
-                                debugPrint("******* Workout builder workout and error are nil *******")
-                            }
-                        })
-                    }
-                }
+            case .ended: break
+//                workoutBuilder.endCollection(withEnd: date) { [weak self] _, error in
+//                    guard let self = self else { return }
+//                    if let error = error {
+//                        debugPrint("******* Workout builder end collection error:", error)
+//                    } else {
+//                        self.workoutBuilder.finishWorkout(completion: { workout, error in
+//                            if let error = error {
+//                                debugPrint("******* Workout builder finish workout error:", error)
+//                            } else if let workout = workout {
+//                                debugPrint("******* Workout builder finish workout finished successfully:", workout)
+//                                // Save HKWorkout in order to finish route of workout route builder
+//                                healthStore.save(self.workout) { _, error in
+//                                    if let error = error {
+//                                        debugPrint("Error saving HKWorkout with healthStore with error:", error)
+//                                    } else {
+//                                        self.workoutRouteBuilder.finishRoute(with: self.workout, metadata: nil) { workoutRoute, error in
+//                                            if let error = error {
+//                                                // will error if the HKWorkout instance is not saved prior to calling this method
+//                                                debugPrint("Error finishing workout route with error:", error)
+//                                            } else if let workoutRoute = workoutRoute {
+//                                                debugPrint("Successful completion finishing workout route building with route:", workoutRoute)
+//                                            }
+//                                        }
+//                                    }
+//                                }
+//                            } else {
+//                                debugPrint("******* Workout builder workout and error are nil *******")
+//                            }
+//                        })
+//                    }
+//                }
             case .paused: break
             case .prepared: break
             case .stopped: break
