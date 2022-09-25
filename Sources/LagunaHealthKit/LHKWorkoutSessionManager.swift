@@ -5,6 +5,7 @@
 //  Created by Justin Honda on 3/12/22.
 //
 
+import Foundation
 #if !os(macOS) && os(watchOS)
 import HealthKit
 
@@ -15,7 +16,10 @@ enum LHKWorkoutSessionError: Error {
 
 public final class LHKWorkoutSessionManager: NSObject {
     
-    // MARK: - Public Properties
+    // MARK: - Properties
+    
+    @Published private(set) public var heartRate: Double = 0
+    @Published private(set) public var avgHeartRate: Double = 0
     
     private(set) public var workoutSession: HKWorkoutSession!
     private(set) public var workoutBuilder: HKLiveWorkoutBuilder!
@@ -24,36 +28,21 @@ public final class LHKWorkoutSessionManager: NSObject {
     private(set) public var startDate: Date?
     private(set) public var endDate: Date?
     
-    // MARK: - Public Publishers
-    
-    @Published private(set) public var heartRate: Double = 0
-    @Published private(set) public var avgHeartRate: Double = 0
-    
-    private let workoutConfiguration: HKWorkoutConfiguration
-    
-    // MARK: - Public Init
+    // MARK: - Public
     
     public init(workoutConfiguration: HKWorkoutConfiguration) {
         self.workoutConfiguration = workoutConfiguration
     }
-        
-    // MARK: - Public Methods
+    
+    public func prepare() throws {
+        try configureIfNeeded()
+        workoutSession.prepare()
+    }
     
     public func start() throws {
         startDate = .now
         
-        do {
-            workoutSession = try .init(healthStore: healthStore, configuration: workoutConfiguration)
-            workoutRouteBuilder = .init(healthStore: healthStore, device: nil)
-            workoutBuilder = workoutSession.associatedWorkoutBuilder()
-            
-            workoutBuilder.shouldCollectWorkoutEvents = true
-            workoutBuilder.dataSource = .init(healthStore: healthStore, workoutConfiguration: workoutConfiguration)
-            workoutBuilder.delegate = self
-            workoutSession.delegate = self
-        } catch {
-            throw LHKWorkoutSessionError.failedToStartWorkoutSession(with: error)
-        }
+        try configureIfNeeded()
         
         workoutSession.startActivity(with: startDate!)
         
@@ -65,7 +54,7 @@ public final class LHKWorkoutSessionManager: NSObject {
             }
         }
         
-        DispatchQueue.global(qos: .background).async { [weak self] in
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
             self.streamingQueries.insert(self.createStreamingHeartRateQuery(with: self.startDate!))
         }
@@ -95,36 +84,31 @@ public final class LHKWorkoutSessionManager: NSObject {
         streamingQueries.forEach { healthStore.stop($0) }
         streamingQueries.removeAll()
         workoutSession.end()
-        
-        // *** Required for finishRoute() method of workoutRouteBuilder *** //
-        workout = HKWorkout(activityType: workoutConfiguration.activityType, start: startDate!, end: endDate!)
-        
-        workoutBuilder.endCollection(withEnd: endDate!) { [weak self] _, error in
-            guard let self = self else { return }
-            if let error = error {
-                debugPrint("******* Workout builder end collection error:", error)
-            } else {
-                healthStore.save(self.workout) { success, error in
-                    guard success else {
-                        debugPrint("finishWorkout error", error as Any)
-                        return
-                    }
-                    self.workoutRouteBuilder.finishRoute(with: self.workout, metadata: nil) { workoutRoute, error in
-                        if let error = error {
-                            // will error if the HKWorkout instance is not saved prior to calling this method
-                            debugPrint("Error finishing workout route with error:", error)
-                        } else if let workoutRoute = workoutRoute {
-                            debugPrint("Successful completion finishing workout route building with route:", workoutRoute)
-                        }
-                    }
-                }
-            }
-        }
     }
     
-    // MARK: - Private Properties
+    // MARK: - Private
     
+    private let workoutConfiguration: HKWorkoutConfiguration
     private var streamingQueries = Set<HKQuery>()
+    
+    private func configureIfNeeded() throws {
+        guard workoutSession == nil else {
+            return
+        }
+        
+        do {
+            workoutSession = try .init(healthStore: healthStore, configuration: workoutConfiguration)
+            workoutRouteBuilder = .init(healthStore: healthStore, device: nil)
+            workoutBuilder = workoutSession.associatedWorkoutBuilder()
+            
+            workoutBuilder.shouldCollectWorkoutEvents = true
+            workoutBuilder.dataSource = .init(healthStore: healthStore, workoutConfiguration: workoutConfiguration)
+            workoutBuilder.delegate = self
+            workoutSession.delegate = self
+        } catch {
+            throw LHKWorkoutSessionError.failedToStartWorkoutSession(with: error)
+        }
+    }
     
 }
 
@@ -150,6 +134,10 @@ extension LHKWorkoutSessionManager {
 
 extension LHKWorkoutSessionManager: HKWorkoutSessionDelegate {
     
+    private func endCollection(at date: Date) async throws {
+        try await workoutBuilder.endCollection(at: date)
+    }
+    
     public func workoutSession(_ workoutSession: HKWorkoutSession,
                                didChangeTo toState: HKWorkoutSessionState,
                                from fromState: HKWorkoutSessionState,
@@ -160,38 +148,28 @@ extension LHKWorkoutSessionManager: HKWorkoutSessionDelegate {
         switch toState {
             case .notStarted: break
             case .running: break
-            case .ended: break
-//                workoutBuilder.endCollection(withEnd: date) { [weak self] _, error in
-//                    guard let self = self else { return }
-//                    if let error = error {
-//                        debugPrint("******* Workout builder end collection error:", error)
-//                    } else {
-//                        self.workoutBuilder.finishWorkout(completion: { workout, error in
-//                            if let error = error {
-//                                debugPrint("******* Workout builder finish workout error:", error)
-//                            } else if let workout = workout {
-//                                debugPrint("******* Workout builder finish workout finished successfully:", workout)
-//                                // Save HKWorkout in order to finish route of workout route builder
-//                                healthStore.save(self.workout) { _, error in
-//                                    if let error = error {
-//                                        debugPrint("Error saving HKWorkout with healthStore with error:", error)
-//                                    } else {
-//                                        self.workoutRouteBuilder.finishRoute(with: self.workout, metadata: nil) { workoutRoute, error in
-//                                            if let error = error {
-//                                                // will error if the HKWorkout instance is not saved prior to calling this method
-//                                                debugPrint("Error finishing workout route with error:", error)
-//                                            } else if let workoutRoute = workoutRoute {
-//                                                debugPrint("Successful completion finishing workout route building with route:", workoutRoute)
-//                                            }
-//                                        }
-//                                    }
-//                                }
-//                            } else {
-//                                debugPrint("******* Workout builder workout and error are nil *******")
-//                            }
-//                        })
-//                    }
-//                }
+            case .ended:
+            workout = .init(activityType: workoutConfiguration.activityType, start: workoutSession.startDate ?? startDate!, end: date)
+            workoutBuilder.endCollection(withEnd: date) { [weak self] _, error in
+                guard let self = self else { return }
+                if let error = error {
+                    print("Error ending HKWorkoutBuilder collection: \( error.localizedDescription)")
+                } else {
+                    self.workoutBuilder.finishWorkout(completion: { hkWorkout, error in
+                        if let error = error {
+                            print("Error finishing workout: \(error)")
+                        } else {
+                            self.workoutRouteBuilder.finishRoute(with: hkWorkout ?? self.workout, metadata: nil) { route, error in
+                                if let error = error {
+                                    print("Error finishing route: \(error)")
+                                } else {
+                                    print("Successfully finised route: \(String(describing: route))")
+                                }
+                            }
+                        }
+                    })
+                }
+            }
             case .paused: break
             case .prepared: break
             case .stopped: break
